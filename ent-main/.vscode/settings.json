@@ -1,0 +1,20 @@
+{
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "go.useLanguageServer": true,
+  "go.testEnvVars": {
+    "DB_CONNECTION_STRING": "postgres://ola:@localhost/ent_test?sslmode=disable"
+  },
+  "go.testTimeout": "90s",
+  "prettier.configPath": "ts/.prettierrc"
+  // "jest.pathToConfig": "jest.config.js",
+  // // TODO need to figure out how to get vscode intellisense to understand all these paths
+  // "jest.rootPath": "ts",
+  // "jest.autoEnable": true,
+  // "jest.pathToJest": "jest",
+  // "jest.debugMode": true
+}

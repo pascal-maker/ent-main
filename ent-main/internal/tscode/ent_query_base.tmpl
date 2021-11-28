@@ -1,0 +1,155 @@
+{{ reserveImport .Package.InternalImportPath "EdgeType" "NodeType" }}
+{{ reserveImport .Package.PackagePath "Ent" "ID" "Data" "Viewer" "EdgeQuerySource" "BaseEdgeQuery" "AssocEdge" "AssocEdgeQueryBase" "CustomEdgeQueryBase" "query" "RawCountLoaderFactory" "AssocEdgeCountLoaderFactory" "AssocEdgeLoaderFactory" "IndexLoaderFactory" "loadEnt" "LoadEntOptions"}}
+{{$importPath := .Package.InternalImportPath -}}
+{{reserveImport "src/ent/generated/loadAny" "getLoaderOptions" -}}
+
+{{$schema := .Schema}}
+
+{{with .Info -}}
+
+  {{ range .Imports }} 
+    {{ if .DefaultImport -}}
+      {{ reserveDefaultImport .PackagePath .Import}}
+    {{ else -}}
+      {{ reserveImport .PackagePath .Import}}
+    {{end -}}
+  {{ end}}
+
+  {{$node := useImport .Node}}
+  {{$sourcePolymorphic := .SourcePolymorphic }}
+
+  {{range $edge := .AssocEdges}}
+    {{$edgeType := printf "%s.%s" (useImport "EdgeType") $edge.TsEdgeConst -}}
+    {{ reserveImport $importPath $edge.TsEdgeQueryEdgeName -}}
+    {{$edgeName := useImport $edge.TsEdgeQueryEdgeName -}}
+    export const {{$edge.GetCountFactoryName}} = new {{useImport "AssocEdgeCountLoaderFactory"}}(
+      {{$edgeType}},
+    );
+    export const {{$edge.GetDataFactoryName}} = new {{useImport "AssocEdgeLoaderFactory"}}(
+      {{$edgeType}},
+      () => {{$edgeName}},
+    );
+
+  {{end -}}
+
+  {{range $edge := .IndexedEdges -}}
+    {{$node := useImport $edge.GetNodeInfo.Node -}}
+      export const {{$edge.GetCountFactoryName}} = new {{useImport "RawCountLoaderFactory"}}({
+        ...{{$node}}.loaderOptions(),
+        groupCol: {{$edge.QuotedDBColName}},
+      });
+      export const {{$edge.GetDataFactoryName}} = new {{useImport "IndexLoaderFactory"}}(
+        {{$node}}.loaderOptions(),
+        {{$edge.QuotedDBColName}},
+        {
+          toPrime: [{{useImport (printf "%sLoader" $edge.GetNodeInfo.NodeInstance)}}],
+        }
+      );
+  {{end -}}
+
+  {{range $edge := .AssocEdges}}
+    {{$name := printf "%sBase" $edge.TsEdgeQueryName -}}
+    {{ reserveImport $importPath $edge.TsEdgeQueryEdgeName -}}
+    {{$edgeName := useImport $edge.TsEdgeQueryEdgeName -}}
+    {{$destNode := useImport .NodeInfo.Node -}}
+    {{$thisType := printf "new (viewer: Viewer, src: EdgeQuerySource<%s, %s>) => T" $node $destNode}}
+
+  export abstract class {{$name}} extends {{useImport "AssocEdgeQueryBase"}}<{{$node}}, {{$destNode}}, {{$edgeName}}> {
+    constructor(
+      viewer: {{useImport "Viewer"}}, 
+      src: {{useImport "EdgeQuerySource"}}<{{$node}}, {{$destNode}}>,
+    ) {
+      super(
+        viewer, 
+        src, 
+        {{$edge.GetCountFactoryName}},
+        {{$edge.GetDataFactoryName}},
+        {{ if $edge.PolymorphicEdge -}}
+          (str) => {{useImport "getLoaderOptions"}}(str as {{useImport "NodeType"}}),
+        {{ else -}}
+        {{useImport .NodeInfo.Node}}.loaderOptions(),
+        {{ end -}}
+      );
+    }
+
+    static query<T extends {{$name}}>(
+      this: {{$thisType}},
+      viewer: {{useImport "Viewer"}},
+      src: {{useImport "EdgeQuerySource"}}<{{$node}}, {{$destNode}}>,
+    ): T {
+      return new this(viewer, src);
+    }
+
+    {{ if $sourcePolymorphic -}}
+      protected abstract getSourceLoadEntOptions(): {{useImport "LoadEntOptions"}}<{{useImport "Ent"}}>;
+    {{ end }}
+
+    sourceEnt(id: {{useImport "ID"}}) {
+      {{if $sourcePolymorphic -}}
+        return {{useImport "loadEnt"}}(this.viewer, id, this.getSourceLoadEntOptions());
+      {{ else -}}
+        return {{$node}}.load(this.viewer, id);
+      {{ end -}}
+    }
+
+    {{if not $edge.PolymorphicEdge -}}
+      {{$fNodeData := $schema.GetNodeDataForNode .NodeInfo.Node}}
+      {{ range $fEdge := $fNodeData.EdgeInfo.Associations -}}
+        {{$queryName := useImport $fEdge.TsEdgeQueryName -}}
+        query{{$fEdge.CamelCaseEdgeName}}(): {{$queryName}} {
+          return {{$queryName}}.query(this.viewer, this);
+        }
+
+    {{end -}}
+    {{ end -}}
+  }
+  {{end}}
+
+  {{range $edge := .IndexedEdges -}}
+    {{$name := printf "%sBase" $edge.TsEdgeQueryName -}}
+    {{$srcNode := useImport $edge.GetSourceNodeName -}}
+    {{$node := useImport $edge.GetNodeInfo.Node -}}
+    {{$srcPoly := $edge.SourceIsPolymorphic -}}
+    {{$srcType := printf "%s | %s " $srcNode (useImport "ID") }}
+    {{ if $srcPoly -}}
+      {{$srcType = $srcNode }}
+    {{ end -}}
+
+    {{$thisType := printf "new (viewer: Viewer, src: %s  ) => T" $srcType }}
+
+    export class {{$name}} extends {{useImport "CustomEdgeQueryBase"}}<{{$srcNode}}, {{$node}}> {
+    {{ if $srcPoly -}}
+      constructor(viewer: {{useImport "Viewer"}}, private srcEnt: {{$srcType }}) {
+        super(viewer, {
+          src: srcEnt, 
+    {{ else -}}
+      constructor(viewer: {{useImport "Viewer"}}, src: {{$srcType }}) {
+        super(viewer, {
+          src: src, 
+    {{ end -}}
+          countLoaderFactory: {{$edge.GetCountFactoryName}},
+          dataLoaderFactory: {{$edge.GetDataFactoryName}},
+          options:{{$node}}.loaderOptions(), 
+        });
+      }
+
+      static query<T extends {{$name}}>(
+        this: {{$thisType}},
+        viewer: {{useImport "Viewer"}},
+        src: {{$srcType}},
+      ): T {
+        return new this(viewer, src);
+      }
+
+      {{ if $srcPoly -}}
+        async sourceEnt(_id: ID) {
+          return this.srcEnt;
+      {{ else -}}
+        async sourceEnt(id: ID) {
+          return {{$srcNode}}.load(this.viewer, id);
+      {{ end -}}
+      }
+    }
+
+  {{end }}
+{{end -}}

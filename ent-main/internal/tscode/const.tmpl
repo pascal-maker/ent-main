@@ -1,0 +1,5 @@
+{{template "enum.tmpl" .NodeType }}
+
+{{ if .EdgeType.Values -}}
+  {{template "enum.tmpl" .EdgeType }}
+{{end -}}

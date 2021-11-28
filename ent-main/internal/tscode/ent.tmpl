@@ -1,0 +1,12 @@
+{{$pkgPath := .Package.InternalImportPath}}
+
+{{with .NodeData -}}
+{{$baseClass := printf "%sBase" .Node }}
+
+{{ reserveImport $pkgPath $baseClass }}
+
+export class {{.Node}} extends {{useImport $baseClass}} {
+
+
+}
+{{end -}}

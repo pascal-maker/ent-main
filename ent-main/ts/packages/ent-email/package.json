@@ -1,0 +1,45 @@
+{
+  "name": "@snowtop/ent-email",
+  "version": "0.0.2",
+  "description": "snowtop ent email datatype",
+  "main": "dist/email.js",
+  "types": "dist/email.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "test": "jest",
+    "prepublishOnly": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:lolopinto/ent.git",
+    "directory": "packages/ent-email"
+  },
+  "keywords": [
+    "snowtop",
+    "ent",
+    "email",
+    "datatype"
+  ],
+  "author": "lolopinto",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lolopinto/ent/issues"
+  },
+  "homepage": "https://github.com/lolopinto/ent#readme",
+  "dependencies": {
+    "email-addresses": "^4.0.0"
+  },
+  "devDependencies": {
+    "@snowtop/ent": "^0.0.1",
+    "@types/jest": "^27.0.1",
+    "jest": "^27.1.1",
+    "tar": "^6.1.6",
+    "ts-jest": "^27.0.5",
+    "typescript": "^4.2.4"
+  },
+  "peerDependencies": {
+    "@snowtop/ent": ">= 0.0.1"
+  }
+}

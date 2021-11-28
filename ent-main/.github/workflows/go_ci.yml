@@ -1,0 +1,104 @@
+name: Go CI
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'ent/**.go'
+      - 'internal/**.go'
+      - 'ts/src/**'
+      - .github/workflows/go_ci.yml
+
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    
+    # Service containers to run with `build`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:13.4
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v2
+      
+    - uses: actions/cache@v2
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - uses: actions/cache@v2
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('ts/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+        
+    - name: Set up python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '>3.6' 
+      
+    - name: install auto_schema
+      run: python3 -m pip install wheel auto_schema==0.0.12
+
+    - name: Setup nodejs
+      uses: actions/setup-node@v2
+      with:
+        always-auth: true
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@lolopinto'
+        node-version: 14.x
+    - run: npm install -g ts-node prettier typescript 
+    - run: |
+        cd ts 
+        npm ci
+      env:
+        NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+
+    - name: Setup ripgrep
+      run: curl -LO https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep_13.0.0_amd64.deb && sudo dpkg -i ripgrep_13.0.0_amd64.deb
+
+    # - name: Build
+    #   run: go build -v ./...
+      
+    - name: setup db
+      run: cd test_setup && go run .
+      env:
+          DB_CONNECTION_STRING: 'postgres://postgres:postgres@localhost:5432/postgres'
+
+    - name: Test
+      run:  go test ./... -short 
+      env:
+          DB_CONNECTION_STRING: 'postgres://postgres:postgres@localhost:5432/postgres'
+          POSTGRES_PASSWORD: 'postgres'
+          POSTGRES_USER: 'postgres'
